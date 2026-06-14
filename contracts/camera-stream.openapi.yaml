@@ -116,6 +116,19 @@ paths:
                   nextCursor: { type: string, nullable: true }
                   hasMore: { type: boolean }
 
+  /detections/recent:
+    get:
+      tags: [detection]
+      summary: Các detection gần đây nhất
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DetectionResult' }
+
   /detections/{detectionId}:
     get:
       tags: [detection]

@@ -1,52 +1,41 @@
-# RUN_COMPOSE.md – Hướng dẫn vận hành Camera Stream Stack (Team A2)
+# Hướng dẫn chạy Camera Stream Stack (Team A2)
 
-Tài liệu này hướng dẫn chạy toàn bộ stack Camera Stream tích hợp AI Vision dành cho Lab 05.
+Tài liệu này hướng dẫn khởi chạy hệ thống Camera Stream tích hợp AI Vision Provider theo đúng quy trình Lab 05.
 
-## 1. Chuẩn bị
+## 1. Yêu cầu hệ thống
+- Docker & Docker Compose v2
+- Node.js & Newman (để chạy test)
+- Đã tạo mạng external `class-net` (nếu chạy local):
+  ```bash
+  docker network create class-net
+  ```
+
+## 2. Khởi chạy Stack
+Sử dụng Makefile để build và chạy toàn bộ dịch vụ:
+
 ```bash
-# Copy cấu hình môi trường
+# Tạo file môi trường từ mẫu
 cp .env.example .env
 
-# Khởi chạy stack với Docker Compose
-docker compose up -d --build
+# Khởi chạy stack (API, DB, AI)
+make compose-up
 ```
 
-## 2. Kiểm tra trạng thái sẵn sàng (Readiness)
-Sau khi chạy, hãy đợi các container báo `healthy`. Kiểm tra qua:
-- **Camera API (Port 8000):** `curl http://localhost:8000/health`
-- **AI Vision Provider (Port 9000):** `curl http://localhost:9000/health`
+## 3. Kiểm tra trạng thái sẵn sàng
+Hệ thống sử dụng cơ chế Healthcheck của Docker. Bạn có thể kiểm tra qua:
+- **API:** `http://localhost:8000/health`
+- **AI Service:** `http://localhost:9000/health`
 - **Database:** `docker exec -it camera-db pg_isready -U lab05`
 
-## 3. Kiểm thử luồng Async Detection
-Do hệ thống chạy theo mô hình Async (202 Accepted), quy trình kiểm thử như sau:
+## 4. Luồng kiểm thử Async (Quan trọng)
+Hệ thống Camera Stream hoạt động theo mô hình Async Webhook:
+1. **Gửi yêu cầu:** `POST /detect` -> Nhận `202 Accepted` và `detectionId`.
+2. **Xử lý ngầm:** AI Vision Provider xử lý trong 2 giây.
+3. **Webhook Callback:** AI Provider gọi lại `/webhook/detection-completed` để cập nhật kết quả.
+4. **Kiểm tra kết quả:** `GET /detections/{id}` để xem thông tin `boundingBox` và `status: COMPLETED`.
 
-**Bước 1: Gửi yêu cầu phân tích frame**
+## 5. Chạy Automated Tests
 ```bash
-curl -X POST http://localhost:8000/detect \
-  -H "Authorization: Bearer lab-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "cameraId": "CAM-01",
-    "frameUrl": "https://campus.local/frame01.jpg",
-    "timestamp": "2026-05-13T10:00:00Z",
-    "requestId": "REQ-001",
-    "analysisType": "PERSON_DETECTION"
-  }'
+npm run test:compose
 ```
-*Kết quả mong đợi:* Trả về `202 Accepted` cùng một `detectionId`.
-
-**Bước 2: Kiểm tra trạng thái xử lý** (Sử dụng `detectionId` từ bước 1)
-```bash
-curl -H "Authorization: Bearer lab-token" http://localhost:8000/detections/<detectionId>
-```
-*Kết quả mong đợi:* Ban đầu là `PROCESSING`, sau vài giây sẽ chuyển sang `COMPLETED` kèm dữ liệu `boundingBox` và `trackingId` từ AI Provider.
-
-**Bước 3: Xem danh sách các phát hiện**
-```bash
-curl -H "Authorization: Bearer lab-token" http://localhost:8000/detections
-```
-
-## 4. Dọn dẹp
-```bash
-docker compose down -v
-```
+Kết quả báo cáo sẽ sinh ra tại thư mục `reports/`.

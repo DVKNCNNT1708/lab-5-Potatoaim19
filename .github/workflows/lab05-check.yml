@@ -27,6 +27,10 @@ jobs:
       - name: Create .env from example
         run: cp .env.example .env
 
+      # Khắc phục lỗi thiếu mạng external class-net trong môi trường CI
+      - name: Create external network
+        run: docker network create class-net || true
+
       - name: Build and start Compose stack
         run: docker compose up -d --build --wait
 
@@ -36,7 +40,6 @@ jobs:
       - name: Run Newman collection
         run: |
           mkdir -p reports
-          # Ưu tiên chạy file camera-stream mới
           newman run postman/collections/camera-stream.postman_collection.json \
             -e postman/environments/camera-stream_local.postman_environment.json \
             -r cli,junit,htmlextra \
