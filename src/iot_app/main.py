@@ -2,10 +2,11 @@ import os
 import uuid
 import asyncio
 import httpx
+from enum import Enum
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 from fastapi import FastAPI, BackgroundTasks, HTTPException, status, Header, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 # Configuration
 SERVICE_NAME = os.getenv("SERVICE_NAME", "camera-stream-service")
@@ -19,8 +20,13 @@ app = FastAPI(
     description="Service for camera frame analysis and tracking (Lab 05).",
 )
 
-# In-memory storage (Simulating DB)
+# In-memory storage
 DETECTIONS_DB: Dict[str, dict] = {}
+
+class AnalysisType(str, Enum):
+    PERSON_DETECTION = "PERSON_DETECTION"
+    VEHICLE_DETECTION = "VEHICLE_DETECTION"
+    UNKNOWN = "UNKNOWN"
 
 class BoundingBox(BaseModel):
     x: int
@@ -41,7 +47,7 @@ class DetectRequest(BaseModel):
     frameUrl: str
     timestamp: str
     requestId: str
-    analysisType: str
+    analysisType: AnalysisType
 
 class DetectionResponse(BaseModel):
     detectionId: str
@@ -58,16 +64,16 @@ def health():
 async def trigger_ai_analysis(detection_id: str, payload: DetectRequest):
     try:
         async with httpx.AsyncClient() as client:
-            # Gọi AI Provider
             await client.post(
                 f"{AI_SERVICE_URL}/detect",
                 json=payload.model_dump(),
                 timeout=5.0
             )
-            # Sau khi AI nhận (202), trạng thái tại API là PROCESSING
-            DETECTIONS_DB[detection_id]["status"] = "PROCESSING"
+            if detection_id in DETECTIONS_DB:
+                DETECTIONS_DB[detection_id]["status"] = "PROCESSING"
     except Exception:
-        DETECTIONS_DB[detection_id]["status"] = "FAILED"
+        if detection_id in DETECTIONS_DB:
+            DETECTIONS_DB[detection_id]["status"] = "FAILED"
 
 @app.post("/detect", status_code=status.HTTP_202_ACCEPTED, response_model=DetectionResponse, dependencies=[Depends(verify_token)])
 async def create_detection(payload: DetectRequest, background_tasks: BackgroundTasks):
@@ -75,21 +81,20 @@ async def create_detection(payload: DetectRequest, background_tasks: BackgroundT
     DETECTIONS_DB[detection_id] = {
         "detectionId": detection_id,
         "status": "ACCEPTED",
-        "timestamp": payload.timestamp
+        "timestamp": payload.timestamp,
+        "cameraId": payload.cameraId
     }
     background_tasks.add_task(trigger_ai_analysis, detection_id, payload)
     return {"detectionId": detection_id, "status": "PROCESSING"}
 
-# WEBHOOK ENDPOINT: AI Vision gọi lại đây
 @app.post("/webhook/detection-completed", status_code=status.HTTP_200_OK)
 async def receive_detection_result(payload: DetectionWebhookPayload):
     if payload.detectionId in DETECTIONS_DB:
         DETECTIONS_DB[payload.detectionId].update(payload.model_dump())
-        print(f"Webhook received: Detection {payload.detectionId} is now {payload.status}")
     return {"message": "Webhook received"}
 
 @app.get("/detections", dependencies=[Depends(verify_token)])
-def list_detections(cursor: Optional[str] = None, limit: int = 20):
+def list_detections(limit: int = 20):
     return {"items": list(DETECTIONS_DB.values())[:limit], "nextCursor": None, "hasMore": False}
 
 @app.get("/detections/recent", dependencies=[Depends(verify_token)])

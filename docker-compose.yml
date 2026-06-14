@@ -1,11 +1,8 @@
-version: "3.8"
-
 services:
-  # Camera Stream API (Team A2)
+  # Camera Stream API (Team A2 - Consumer)
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
+    image: v1.0.0-team-camera
     container_name: camera-stream-api
     environment:
       - SERVICE_NAME=camera-stream-service
@@ -24,7 +21,7 @@ services:
     ports:
       - "8000:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -47,20 +44,19 @@ services:
       timeout: 5s
       retries: 5
 
-  # AI Vision Provider (Mock)
+  # AI Vision Provider (Team A2 - Provider)
   ai-service:
-    image: python:3.11-slim
+    build: .
+    image: v1.0.0-team-camera
     container_name: ai-vision-provider
-    working_dir: /service
-    volumes:
-      - ./src/ai_service:/service
-    # Cài đặt dependency trực tiếp cho mock service
-    command: >
-      sh -c "pip install fastapi uvicorn pydantic && python main.py"
+    environment:
+      - WEBHOOK_URL=http://api:8000/webhook/detection-completed
+    # Chạy AI service trên port 9000 sử dụng mã nguồn trong src/ai_service
+    command: ["uvicorn", "ai_service.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "9000"]
     networks:
       - team-internal
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
