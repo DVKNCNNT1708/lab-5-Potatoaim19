@@ -2,14 +2,14 @@ services:
   # Camera Stream API (Team A2 - Consumer)
   api:
     build: .
-    image: v1.0.0-team-camera-api
+    image: v0.1.0-team-camera-api
     container_name: camera-stream-api
     environment:
       - SERVICE_NAME=camera-stream-service
-      - SERVICE_VERSION=1.0.0
+      - SERVICE_VERSION=0.1.0
       - AUTH_TOKEN=lab-token
-      - AI_SERVICE_URL=http://ai-vision-provider:8004
-      - APP_PORT=8002
+      - AI_SERVICE_URL=http://ai-vision-provider:9000
+      - APP_PORT=8000
       - CAMERA_STREAM_URL=https://camera.labaiotdnu.app/video?key=demo
     depends_on:
       db:
@@ -20,11 +20,11 @@ services:
       - team-internal
       - class-net
     ports:
-      - "8002:8002"
+      - "8000:8000"
     volumes:
       - snapshots-data:/app/snapshots
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -50,19 +50,19 @@ services:
   # AI Vision Provider (Mock A4)
   ai-service:
     build: .
-    image: v1.0.0-team-camera-ai
+    image: v0.1.0-team-camera-ai
     container_name: ai-vision-provider
     environment:
-      - WEBHOOK_URL=http://camera-stream-api:8002/webhook/detection-completed
+      - WEBHOOK_URL=http://camera-stream-api:8000/webhook/detection-completed
       - SNAPSHOT_DIR=/app/snapshots
-      - APP_PORT=8004
-    command: ["uvicorn", "ai_service.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8004"]
+      - APP_PORT=9000
+    command: ["uvicorn", "ai_service.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "9000"]
     volumes:
       - snapshots-data:/app/snapshots
     networks:
       - team-internal
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
