@@ -2,14 +2,15 @@ services:
   # Camera Stream API (Team A2 - Consumer)
   api:
     build: .
-    image: v1.0.0-team-camera
+    image: v1.0.0-team-camera-api
     container_name: camera-stream-api
     environment:
       - SERVICE_NAME=camera-stream-service
       - SERVICE_VERSION=1.0.0
       - AUTH_TOKEN=lab-token
-      - AI_SERVICE_URL=http://ai-service:9000
-      - APP_PORT=8000
+      - AI_SERVICE_URL=http://ai-vision-provider:8004
+      - APP_PORT=8002
+      - CAMERA_STREAM_URL=https://camera.labaiotdnu.app/video?key=demo
     depends_on:
       db:
         condition: service_healthy
@@ -19,9 +20,11 @@ services:
       - team-internal
       - class-net
     ports:
-      - "8000:8000"
+      - "8002:8002"
+    volumes:
+      - snapshots-data:/app/snapshots
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -44,19 +47,22 @@ services:
       timeout: 5s
       retries: 5
 
-  # AI Vision Provider (Team A2 - Provider)
+  # AI Vision Provider (Mock A4)
   ai-service:
     build: .
-    image: v1.0.0-team-camera
+    image: v1.0.0-team-camera-ai
     container_name: ai-vision-provider
     environment:
-      - WEBHOOK_URL=http://api:8000/webhook/detection-completed
-    # Chạy AI service trên port 9000 sử dụng mã nguồn trong src/ai_service
-    command: ["uvicorn", "ai_service.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "9000"]
+      - WEBHOOK_URL=http://camera-stream-api:8002/webhook/detection-completed
+      - SNAPSHOT_DIR=/app/snapshots
+      - APP_PORT=8004
+    command: ["uvicorn", "ai_service.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8004"]
+    volumes:
+      - snapshots-data:/app/snapshots
     networks:
       - team-internal
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -69,3 +75,4 @@ networks:
 
 volumes:
   db-data:
+  snapshots-data:

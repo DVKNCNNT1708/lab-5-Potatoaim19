@@ -1,34 +1,34 @@
-# Readiness Checklist - Team A2 (Camera Stream)
+# Readiness Checklist - Team A2 & A4 (Smart Campus Integration)
 
-Tài liệu này đánh giá mức độ sẵn sàng của stack Camera Stream trước khi tích hợp vào hệ thống chung (Plug-a-thon).
+Tài liệu này đánh giá mức độ sẵn sàng của stack trước khi thực hiện Pull Request vào repo của Leader.
 
 ## 1. Sẵn sàng Cơ sở dữ liệu (Database Readiness)
 - [x] Container `camera-db` đã khởi động thành công.
 - [x] Lệnh `pg_isready` trả về trạng thái sẵn sàng.
-- [x] Volume `db-data` được gắn đúng để lưu trữ lịch sử detection.
+- [x] Volume `db-data` được gắn đúng để lưu trữ dữ liệu bền vững.
 
-## 2. Sẵn sàng AI Vision Provider (AI Readiness)
-- [x] Container `ai-vision-provider` đã load mock logic.
+## 2. Sẵn sàng AI Vision Provider (AI Readiness - A4)
+- [x] Container `ai-vision-provider` lắng nghe trên port **8004**.
 - [x] Endpoint `GET /health` của AI service trả về 200 OK.
-- [x] Camera Stream API có thể gọi thành công `POST /detect` sang AI service qua network `team-internal`.
+- [x] Đã cấu hình `WEBHOOK_URL` trỏ về port **8002** của Camera API.
 
 ## 3. Xác thực & Bảo mật (Token & Auth)
-- [x] Biến môi trường `AUTH_TOKEN` được thiết lập (mặc định: `lab-token`).
-- [x] Header `Authorization: Bearer <token>` hoạt động đúng cho các endpoint nghiệp vụ.
-- [x] Không có secret/password thật sự bị commit vào git (đã kiểm tra `.env`).
+- [x] Biến môi trường `AUTH_TOKEN` được thiết lập đồng nhất.
+- [x] Header `Authorization: Bearer <token>` hoạt động đúng cho các endpoint.
+- [x] Đã kiểm tra và loại bỏ secret khỏi git (chỉ dùng `.env.example`).
 
-## 4. Cấu hình Port & Network
-- [x] Camera Stream API lắng nghe trên port công cộng `8000`.
-- [x] AI Service lắng nghe nội bộ trên port `9000`.
-- [x] Network `team-internal` cho phép giao tiếp giữa API, DB và AI Provider.
-- [x] Sẵn sàng kết nối với `class-net` để nhận request từ Core Business.
+## 4. Cấu hình Port & Network (Ma trận kết nối)
+- [x] **A2: Camera Stream** chạy trên port **8002**.
+- [x] **A4: AI Vision** chạy trên port **8004**.
+- [x] Cấu hình `class-net` (external) để Leader có thể gọi vào.
+- [x] Giao tiếp nội bộ sử dụng container name (`camera-stream-api`, `ai-vision-provider`).
 
-## 5. Luồng nghiệp vụ Async (Async Flow & Version)
-- [x] `POST /detect` trả về code `202 Accepted` và `detectionId` theo đúng contract.
-- [x] Trạng thái ban đầu của detection là `PROCESSING`.
-- [x] Version API được thiết lập là `1.0.0` (khớp với `SERVICE_VERSION` trong `.env`).
+## 5. Luồng nghiệp vụ & Payload
+- [x] Payload giữa A2 và A4 sử dụng `camelCase` (cameraId, requestId...) khớp với OpenAPI Contract.
+- [x] `POST /detect` trả về `202 Accepted`.
+- [x] Webhook callback trả về kết quả `COMPLETED` sau 2 giây.
 
-## 6. Kiểm thử tự động (Contract Testing)
-- [x] Postman Collection đã được cập nhật cho các endpoint Camera Stream.
-- [x] Chạy thành công Newman test cho luồng: Detect -> Check Status -> List Detections.
-- [x] Report XML/HTML đã được sinh ra trong thư mục `reports/`.
+## 6. Kiểm thử & Bằng chứng (Evidence)
+- [x] Đã cập nhật `RUN_COMPOSE.md` hướng dẫn Leader cách chạy.
+- [x] Chạy thành công Newman test trên môi trường Docker Compose.
+- [x] Đã sinh báo cáo trong thư mục `reports/`.

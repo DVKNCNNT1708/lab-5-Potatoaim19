@@ -1,41 +1,27 @@
-# Hướng dẫn chạy Camera Stream Stack (Team A2)
+# Hướng dẫn chạy Camera Stream Stack (Team A2 & A4)
 
-Tài liệu này hướng dẫn khởi chạy hệ thống Camera Stream tích hợp AI Vision Provider theo đúng quy trình Lab 05.
+Hệ thống này được cấu hình để tích hợp vào Smart Campus Platform.
 
-## 1. Yêu cầu hệ thống
-- Docker & Docker Compose v2
-- Node.js & Newman (để chạy test)
-- Đã tạo mạng external `class-net` (nếu chạy local):
-  ```bash
-  docker network create class-net
-  ```
-
-## 2. Khởi chạy Stack
-Sử dụng Makefile để build và chạy toàn bộ dịch vụ:
-
+## 1. Khởi chạy
 ```bash
-# Tạo file môi trường từ mẫu
+# Tạo file .env
 cp .env.example .env
 
-# Khởi chạy stack (API, DB, AI)
-make compose-up
+# Chạy bằng Docker Compose
+docker compose up -d --build
 ```
 
-## 3. Kiểm tra trạng thái sẵn sàng
-Hệ thống sử dụng cơ chế Healthcheck của Docker. Bạn có thể kiểm tra qua:
-- **API:** `http://localhost:8000/health`
-- **AI Service:** `http://localhost:9000/health`
-- **Database:** `docker exec -it camera-db pg_isready -U lab05`
+## 2. Kiểm tra Health (Theo yêu cầu Leader)
+- **A2: Camera Stream:** `curl http://localhost:8002/health`
+- **A4: AI Vision:** `curl http://localhost:8004/health`
 
-## 4. Luồng kiểm thử Async (Quan trọng)
-Hệ thống Camera Stream hoạt động theo mô hình Async Webhook:
-1. **Gửi yêu cầu:** `POST /detect` -> Nhận `202 Accepted` và `detectionId`.
-2. **Xử lý ngầm:** AI Vision Provider xử lý trong 2 giây.
-3. **Webhook Callback:** AI Provider gọi lại `/webhook/detection-completed` để cập nhật kết quả.
-4. **Kiểm tra kết quả:** `GET /detections/{id}` để xem thông tin `boundingBox` và `status: COMPLETED`.
+## 3. Ma trận Kết nối đã cấu hình
+- **Sync REST:** A2 (`:8002`) gọi A4 (`:8004`) tại endpoint `POST /detect`.
+- **Async Webhook:** A4 gọi ngược lại A2 tại `POST /webhook/detection-completed`.
+- **Database:** A2 lưu trữ lịch sử tại PostgreSQL port `5432`.
 
-## 5. Chạy Automated Tests
+## 4. Kiểm thử
+Sử dụng Newman để chạy test tự động:
 ```bash
 npm run test:compose
 ```
-Kết quả báo cáo sẽ sinh ra tại thư mục `reports/`.

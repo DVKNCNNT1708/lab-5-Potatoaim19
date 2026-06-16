@@ -11,13 +11,13 @@ from pydantic import BaseModel
 SERVICE_NAME = "ai-vision-service"
 SERVICE_VERSION = "1.0.0"
 
-# Webhook URL của Camera Stream API
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://api:8000/webhook/detection-completed")
+# Webhook URL mặc định trỏ về Camera Stream API (A2) trên port 8002
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://camera-stream-api:8002/webhook/detection-completed")
 
 app = FastAPI(
-    title="AI Vision Provider",
+    title="AI Vision Provider (A4)",
     version=SERVICE_VERSION,
-    description="Mock AI provider that sends results via webhook (Lab 05).",
+    description="Mock AI provider for Smart Campus Platform (Lab 05).",
 )
 
 DETECTIONS_DB: Dict[str, dict] = {}
@@ -57,22 +57,28 @@ def health() -> dict:
     return {"status": "ok", "service": SERVICE_NAME, "version": SERVICE_VERSION}
 
 async def process_and_send_webhook(detection_id: str, analysis_type: str):
+    # Giả lập thời gian xử lý AI
     await asyncio.sleep(2)
+
     detection_result = {
         "detectionId": detection_id,
         "status": "COMPLETED",
         "detectionType": "PERSON" if "PERSON" in analysis_type else "VEHICLE",
-        "confidence": 0.98,
-        "boundingBox": {"x": 150, "y": 100, "width": 200, "height": 300},
+        "confidence": 0.95,
+        "boundingBox": {"x": 100, "y": 150, "width": 80, "height": 200},
         "trackingId": f"TRK-{uuid.uuid4().hex[:6].upper()}"
     }
+
     if detection_id in DETECTIONS_DB:
         DETECTIONS_DB[detection_id].update(detection_result)
+
     try:
         async with httpx.AsyncClient() as client:
-            await client.post(WEBHOOK_URL, json=detection_result, timeout=5.0)
+            print(f"Sending results to webhook: {WEBHOOK_URL}")
+            resp = await client.post(WEBHOOK_URL, json=detection_result, timeout=5.0)
+            print(f"Webhook response: {resp.status_code}")
     except Exception as e:
-        print(f"Webhook failed: {e}")
+        print(f"Webhook failed to {WEBHOOK_URL}: {e}")
 
 @app.post("/detect", status_code=status.HTTP_202_ACCEPTED, response_model=DetectionResponse)
 async def detect(payload: DetectRequest, background_tasks: BackgroundTasks):
@@ -89,10 +95,4 @@ async def detect(payload: DetectRequest, background_tasks: BackgroundTasks):
 
 @app.get("/detections")
 def list_detections():
-    return {"items": list(DETECTIONS_DB.values()), "nextCursor": None, "hasMore": False}
-
-@app.get("/detections/{detection_id}", response_model=DetectionResult)
-def get_detection(detection_id: str):
-    if detection_id not in DETECTIONS_DB:
-        raise HTTPException(status_code=404, detail="Detection not found")
-    return DETECTIONS_DB[detection_id]
+    return {"items": list(DETECTIONS_DB.values())}
